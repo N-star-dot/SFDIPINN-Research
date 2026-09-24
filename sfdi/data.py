@@ -14,20 +14,36 @@ import os
 import numpy as np
 import tifffile
 from matplotlib.path import Path
+from scipy.io import loadmat
 
 
-def read_hyperstack(path):
-    """Return Rd as an array (freq, wavelength, y, x)."""
+def read_hyperstack(path, z_select=None):
+    """Return Rd as (freq, wavelength, y, x). With z_select, read only those
+    frequency slices from disk (a real file is ~353 MB, we need 2 of 8 slices)."""
     with tifffile.TiffFile(path) as tf:
         s = tf.series[0]
-        arr = s.asarray()
-        axes = s.axes                      # e.g. 'ZCYX' for ImageJ hyperstacks
-    want = "ZCYX"
-    for a in want:
-        if a not in axes:                  # single-frequency or single-channel file
+        axes, shape = s.axes, s.shape
+        lead_axes, lead_shape = axes[:-2], shape[:-2]            # everything except Y, X
+        arr = None
+        if z_select is not None and "Z" in lead_axes and len(tf.pages) == int(np.prod(lead_shape)):
+            # read page by page: only the frequency slices we need
+            zpos = lead_axes.index("Z")
+            keys, sub_shape = [], list(lead_shape)
+            sub_shape[zpos] = len(z_select)
+            for idx in np.ndindex(*sub_shape):
+                full = list(idx); full[zpos] = z_select[idx[zpos]]
+                keys.append(int(np.ravel_multi_index(full, lead_shape)))
+            arr = tf.asarray(key=keys).reshape(*sub_shape, *shape[-2:])
+            z_select = None                                     # already applied
+        if arr is None:
+            arr = s.asarray()
+    for a in "ZCYX":
+        if a not in axes:                                       # single-frequency or single-channel file
             arr = arr[np.newaxis]; axes = a + axes
-    arr = np.transpose(arr, [axes.index(a) for a in want])
-    return arr.astype(np.float32)
+    arr = np.transpose(arr, [axes.index(a) for a in "ZCYX"])
+    if z_select is not None:
+        arr = arr[list(z_select)]
+    return np.ascontiguousarray(arr, dtype=np.float32)
 
 
 def hyperstack_labels(path):
@@ -44,11 +60,16 @@ def load_mask(path, shape):
     if ext in (".png", ".tif", ".tiff"):
         from PIL import Image
         return np.array(Image.open(path)) > 0
-    if ext == ".roi":                      # ImageJ ROI saved from the yellow polygons
+    if ext in (".roi", ".zip"):            # ImageJ ROI (or RoiSet.zip) from the yellow polygons
         import roifile                     # pip install roifile
-        xy = roifile.roiread(path).coordinates()
+        rois = roifile.roiread(path)
+        rois = rois if isinstance(rois, list) else [rois]
         yy, xx = np.mgrid[:shape[0], :shape[1]]
-        return Path(xy).contains_points(np.c_[xx.ravel(), yy.ravel()]).reshape(shape)
+        pts = np.c_[xx.ravel(), yy.ravel()]
+        m = np.zeros(shape[0] * shape[1], bool)
+        for r in rois:                     # union of all polygons in the file
+            m |= Path(r.coordinates()).contains_points(pts)
+        return m.reshape(shape)
     raise ValueError(f"unknown mask type {path}")
 
 
@@ -60,16 +81,23 @@ class Cell:
         self.subject, self.site, self.side = subject, site, side
         root = cfg["data_root"]
         fmt = dict(subject=subject, site=site, side=side)
-        stack = read_hyperstack(os.path.join(root, cfg["file_pattern"].format(**fmt)))
         zi = [cfg["stack_freqs"].index(f) for f in cfg["use_freqs"]]
-        self.R = stack[zi]                                     # (2, n_wl, H, W)
+        self.R = read_hyperstack(os.path.join(root, cfg["file_pattern"].format(**fmt)), zi)  # (2, n_wl, H, W)
         self.mask = load_mask(os.path.join(root, cfg["mask_pattern"].format(**fmt)), self.R.shape[-2:])
         ref = os.path.join(root, cfg["ref_pattern"].format(**fmt)) if cfg.get("ref_pattern") else None
+        self.ref_source = None
         if ref and os.path.exists(ref):
-            d = np.load(ref)
-            self.mua_ref, self.musp_ref = d["mua"], d["musp"]  # (n_wl, H, W)
-        elif lut is not None:                                   # fall back: invert with the LUT
-            self.mua_ref, self.musp_ref = lut.inverse(self.R[0], self.R[1], *cfg["use_freqs"])
+            d = np.load(ref) if ref.endswith(".npz") else loadmat(ref)
+            self.mua_ref = np.asarray(d["mua"], np.float32)     # (n_wl, H, W)
+            self.musp_ref = np.asarray(d["musp"], np.float32)
+            self.ref_source = "supplied"
+        elif lut is not None:                                   # fall back: invert with the LUT, ROI only
+            self.mua_ref = np.full(self.R.shape[1:], np.nan, np.float32)
+            self.musp_ref = np.full(self.R.shape[1:], np.nan, np.float32)
+            for w in range(self.R.shape[1]):
+                a, s_ = lut.inverse(self.R[0, w][self.mask], self.R[1, w][self.mask], *cfg["use_freqs"])
+                self.mua_ref[w][self.mask], self.musp_ref[w][self.mask] = a, s_
+            self.ref_source = "LUT inverse of Rd"
         else:
             self.mua_ref = self.musp_ref = None
 

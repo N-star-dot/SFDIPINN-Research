@@ -42,6 +42,7 @@ when you don't yet have the lab's real LUT and data.
 |---|---|---|
 | 0 | `scripts/00_build_standin_lut.py` | stand-in Monte Carlo LUT (skip with the lab LUT) |
 | 0 | `scripts/00_make_synthetic_data.py` | fake C1–C3 subjects in the lab's file format (skip with real data) |
+| check | `scripts/check_setup.py` | checks paths, shapes, frequency order, ROI and LUT coverage. Run after every config change |
 | 1 | `scripts/01_forward_error.py` | Cuccia and PCBC vs LUT maps, per-pixel tables |
 | 2 | `scripts/02_inverse_error.py` | inverse maps in the `(Rd f=0, Rd f=0.1)` plane, tables |
 | 3 | `scripts/03_train_pinn.py` | PINN trained on C1, graded on C2/C3 per wavelength, error maps |
@@ -55,6 +56,8 @@ CPU, much faster on a GPU.
 
 ## Switching to real data
 
+Change only `config.yaml`, then run `python scripts/check_setup.py` until it says "All checks passed".
+
 Edit `config.yaml` (fields that only the project lead can supply are marked `ASK PL`):
 
 1. **Rd files** — set `data_root` and `file_pattern`. Hyperstacks are ImageJ files
@@ -66,7 +69,10 @@ Edit `config.yaml` (fields that only the project lead can supply are marked `ASK
    names in their `.mat` file; `Rd_axes` describes the array ordering.
 4. **Masks** — ROI polygons from ImageJ (`.roi`), or PNG/NPY masks. Set `mask_pattern`.
 5. **Supplied optical properties** — the per-pixel μₐ, μₛ′ maps. Set `ref_pattern`.
-   If missing, the LUT inverse of `Rd` is used instead.
+   Expected: `.npz` or `.mat` with arrays `mua` and `musp`, each shaped (8 wavelengths, 1040, 1392).
+   If their maps are TIFFs, convert once:
+   `np.savez("OP-Arm-Left.npz", mua=tifffile.imread("mua.tif"), musp=tifffile.imread("musp.tif"))`.
+   If the file is missing, the LUT inverse of `Rd` is used instead (the checker says which).
 6. **Forward model** — set `forward.n`, and put the calibrated boundary parameter B
    in `A_value` with `A_source: value`.
 
