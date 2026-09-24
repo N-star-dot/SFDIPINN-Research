@@ -1,0 +1,62 @@
+# ---------------------------------------------------------------------------
+# SFDI PINN replication config. Everything the slides specify is copied here.
+# Lines marked ASK PL are things only your project lead can tell you.
+# ---------------------------------------------------------------------------
+
+# Paths (relative to this folder). Point these at the lab's files.
+data_root: data/synthetic            # ASK PL: where the R-*.tif hyperstacks live
+lut_path: luts/standin_whitemc.npz   # ASK PL: the Monte Carlo LUT they grade against
+lut_format: npz                      # npz | mat
+lut_mat_keys: {mua: mua, musp: musp, freqs: fx, Rd: Rd, Rd_axes: "f,mua,musp"}
+results_dir: results
+
+# File layout. Slide 1 shows files named R-Arm-Left-WithoutCorrection.tif
+file_pattern: "{subject}/R-{site}-{side}-WithoutCorrection.tif"
+mask_pattern: "{subject}/mask-{site}-{side}.npy"   # .npy, .png or ImageJ .roi
+ref_pattern:  "{subject}/OP-{site}-{side}.npz"      # ASK PL: the "supplied" mu_a, mu_s' maps
+
+# Axes of each hyperstack (slide 1: c = 8 wavelengths, z = 8 frequencies)
+wavelengths: [471, 526, 591, 621, 691, 731, 811, 851]
+stack_freqs: [0.0, 0.05, 0.1, 0.15, 0.2, 0.25, 0.3, 0.35]   # ASK PL: real z-slice frequencies
+use_freqs: [0.0, 0.1]                                         # the two the PINN uses
+
+subjects: [C1, C2, C3]               # real data also has P1, P2
+sites: [Arm, Hand]
+sides: [Left, Right]
+
+forward:
+  n: 1.4                             # ASK PL: tissue refractive index in their code
+  A_source: fresnel                  # fresnel | poly | value
+  A_value: null                      # ASK PL: put the calibrated boundary parameter B here
+
+pinn:                                # from slide 17 and the ablation panel (slide 27)
+  widths: [128, 128, 128]
+  activation: silu
+  loss: huber_log                    # huber_log (slide 17) | log_mse (ablation panel says Log MSE)
+  huber_delta: 0.03
+  lr: 0.003
+  lr_decay_per_step: 0.9997
+  batch_size: 32768
+  steps: 10000
+  eval_every: 100
+  seed: 42
+  bounds: {mua: [0.0005, 0.5], musp: [0.02, 10.0]}   # ASK PL: "Physics & output bounds" panel
+
+# Slide 17: train on C1, all four sites, all wavelengths. Predict C2 and C3.
+train_on: {subjects: [C1], sites: [Arm, Hand], sides: [Left, Right], wavelengths: all}
+test_on:  {subjects: [C2, C3], sites: [Arm, Hand], sides: [Left, Right]}
+
+# Slides 6 to 9 and 13 to 16 use these cells for the per-pixel tables
+table_cells: [[C1, Arm, Left], [C1, Hand, Left]]
+
+# Slides 26 to 38. Each run changes only what it lists.
+ablations:
+  - {name: all_wavelengths,  train_on: {subjects: [C2]}}
+  - {name: wl_621_851,       train_on: {subjects: [C2], wavelengths: [621, 691, 731, 811, 851]}}
+  - {name: wl_811_851,       train_on: {subjects: [C2], wavelengths: [811, 851]}}
+  - {name: wl_811,           train_on: {subjects: [C2], wavelengths: [811]}}
+  - {name: wl_471_526,       train_on: {subjects: [C2], wavelengths: [471, 526]}}
+  - {name: site_C2_arm,      train_on: {subjects: [C2], sites: [Arm]}}
+  - {name: site_C2_hand,     train_on: {subjects: [C2], sites: [Hand]}}
+  - {name: subject_C1,       train_on: {subjects: [C1]}}
+  - {name: model_cuccia,     train_on: {subjects: [C2]}, model: cuccia}

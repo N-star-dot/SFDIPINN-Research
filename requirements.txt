@@ -1,0 +1,8 @@
+numpy
+scipy
+torch
+matplotlib
+pandas
+pyyaml
+tifffile
+roifile        # only if your masks are ImageJ .roi files
