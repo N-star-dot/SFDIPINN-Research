@@ -117,6 +117,63 @@ Useful overrides:
 - `config.synthetic.yaml` — the original synthetic-data config, unchanged, for a quick
   end-to-end smoke test with no lab files: `SFDI_CONFIG=config.synthetic.yaml python scripts/check_setup.py`.
 
+## Results on real data
+
+The figures below were made on the lab's data with the lab's LUT (`luts/LUT_g0p9_0_0.1.mat`),
+using the forward-model settings in `config.yaml` (n = 1.4, Fresnel A, not yet the calibrated B).
+Full outputs are in `results/real/` after a run; these copies are in `docs/real_results/`.
+
+### Forward models vs the LUT (step 1)
+
+Relative difference of Cuccia and PCBC from the Monte Carlo LUT across the whole (μₐ, μₛ′)
+grid. PCBC stays within a few percent over most of the region where tissue lies; Cuccia is
+off by 10 to 20% at f = 0.1.
+
+![Forward relative difference](docs/real_results/01c_relative_difference.png)
+
+The same maps with C1-Arm-Left's pixels on top. The vertical stripe of 471/526 nm pixels at
+μₐ = 0.2 is the lab's LUT inversion hitting its cap; those pixels are excluded from grading
+(`ref_caps` in `config.yaml`).
+
+![C1-Arm-Left pixels](docs/real_results/01d_pixels_C1-Arm-Left.png)
+
+Mean absolute relative difference over C1-Arm-Left (all wavelengths, %):
+
+| Model | Rd f = 0 | Rd f = 0.1 |
+|---|---|---|
+| Cuccia | 7.97 | 17.61 |
+| PCBC | 3.19 | 3.96 |
+
+### Inverse error (step 2)
+
+Error in recovered μₐ and μₛ′ across the LUT's (Rd f = 0, Rd f = 0.1) domain. On C1-Arm-Left,
+Cuccia gets μₐ to 3.0% but μₛ′ only to 17.8%; PCBC gets 4.3% and 3.3%.
+
+![Inverse relative error](docs/real_results/02b_inverse_relative.png)
+
+### PINN, trained on C1 and graded on C2 and C3 (step 3, full 10,000 steps)
+
+![PINN error vs wavelength](docs/real_results/03a_error_vs_wavelength.png)
+
+| Wavelength (nm) | 471 | 526 | 591 | 621 | 691 | 731 | 811 | 851 |
+|---|---|---|---|---|---|---|---|---|
+| PCBC μₐ error % | 59.2 | 33.4 | 5.6 | 4.5 | 4.4 | 4.2 | 5.0 | 5.2 |
+| PCBC μₛ′ error % | 23.3 | 12.2 | 2.1 | 3.2 | 4.0 | 4.3 | 4.5 | 4.5 |
+| Cuccia μₐ error % | 68.1 | 40.5 | 2.8 | 2.2 | 4.4 | 5.3 | 6.1 | 6.2 |
+| Cuccia μₛ′ error % | 12.5 | 17.0 | 20.8 | 17.2 | 15.1 | 14.3 | 13.4 | 13.4 |
+
+Per-pixel μₐ error on the held-out C2-Arm-Left. 471 nm is empty and 526 nm is sparse because
+almost every pixel there was capped in the lab's reference map.
+
+![PINN mu_a error maps](docs/real_results/03b_maps_mua_C2-Arm-Left.png)
+
+**Read the 471 and 526 nm numbers with care.** C3's reference μₐ is capped at 0.1955 rather
+than 0.2, so `ref_caps: {mua: 0.2}` does not catch it, and those capped values are still being
+graded. Inverting C3's Rd through the LUT disagrees with its supplied μₐ by 50 to 97% at
+471/526 nm, against under 0.5% at 621 and 811 nm. Those two columns will change once C3's cap
+is handled. Even before that, only ~2% (471 nm) and ~20% (526 nm) of ROI pixels have a usable
+reference value.
+
 ## Code map
 
 | File | What it does |
