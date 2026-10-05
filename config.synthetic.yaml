@@ -1,34 +1,26 @@
 # ---------------------------------------------------------------------------
-# SFDI PINN replication config, pointed at the lab's real files. For the
-# synthetic stand-in data (no lab files needed), use config.synthetic.yaml
-# (SFDI_CONFIG=config.synthetic.yaml) instead.
+# SFDI PINN replication config. Everything the slides specify is copied here.
 # Lines marked ASK PL are things only your project lead can tell you.
 # ---------------------------------------------------------------------------
 
-# Paths (relative to this folder, or set SFDI_DATA_ROOT to override data_root).
-data_root: ~/Downloads/SFDIDATA
-lut_path: luts/LUT_g0p9_0_0.1.mat   # lab Monte Carlo LUT (g = 0.9, f = 0 and 0.1 mm^-1)
-lut_format: mat                      # npz | mat  (stand-in: luts/standin_whitemc.npz with npz)
-lut_mat_keys: {struct: LUT, mua: Mua, musp: Musp, Rd: [M1, M2], freqs: [0.0, 0.1]}   # freqs are not stored in the file
-results_dir: results/real          # synthetic runs go to results/synthetic
-processed_root: data/processed       # fast per-cell .npz cache built by scripts/ingest_data.py
+# Paths (relative to this folder). Point these at the lab's files.
+data_root: data/synthetic            # ASK PL: where the R-*.tif hyperstacks live
+lut_path: luts/standin_whitemc.npz   # ASK PL: the Monte Carlo LUT they grade against
+lut_format: npz                      # npz | mat
+lut_mat_keys: {mua: mua, musp: musp, freqs: fx, Rd: Rd, Rd_axes: "f,mua,musp"}
+results_dir: results/synthetic
 
-# File layout: one folder per subject+site, e.g. SFDIDATA/C1-Arm/R-Arm-Left-WithoutCorrection.tif
-file_pattern: "{subject}-{site}/R-{site}-{side}-WithoutCorrection.tif"
-mask_pattern: "{subject}-{site}/Mask-{site}-{side}-WithoutCorrection.tif"
-ref_pattern:  "{subject}-{site}/M-{site}-{side}-WithoutCorrection.tif"
+# File layout. Slide 1 shows files named R-Arm-Left-WithoutCorrection.tif
+file_pattern: "{subject}/R-{site}-{side}-WithoutCorrection.tif"
+mask_pattern: "{subject}/mask-{site}-{side}.npy"   # .npy, .png or ImageJ .roi
+ref_pattern:  "{subject}/OP-{site}-{side}.npz"      # ASK PL: the "supplied" mu_a, mu_s' maps
 
-# Axes of each hyperstack (8 wavelengths x 8 spatial frequencies)
+# Axes of each hyperstack (slide 1: c = 8 wavelengths, z = 8 frequencies)
 wavelengths: [471, 526, 591, 621, 691, 731, 811, 851]
-stack_freqs: [0.0, 0.05, 0.1, 0.15, 0.2, 0.3, 0.4, 0.5]   # real z-slice frequencies
-use_freqs: [0.0, 0.1]                                       # the two the PINN uses
+stack_freqs: [0.0, 0.05, 0.1, 0.15, 0.2, 0.25, 0.3, 0.35]   # ASK PL: real z-slice frequencies
+use_freqs: [0.0, 0.1]                                         # the two the PINN uses
 
-# The lab's supplied mu_a maps are LUT inversions that hit the LUT bound and
-# get capped at exactly this value on many 471 nm pixels; those pixels (and
-# any NaN failed-inversion pixels) are excluded, not treated as real readings.
-ref_caps: {mua: 0.2}    # ASK PL: confirm this is really the LUT bound
-
-subjects: [C1, C2, C3, P1, P2]
+subjects: [C1, C2, C3]               # real data also has P1, P2
 sites: [Arm, Hand]
 sides: [Left, Right]
 

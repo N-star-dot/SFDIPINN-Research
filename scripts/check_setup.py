@@ -68,7 +68,7 @@ for subject in cfg["subjects"]:
                 c = Cell(cfg, subject, site, side, lut)
             except Exception as e:
                 bad(f"{name}: {e}"); continue
-            roi = c.mask.mean() * 100
+            roi = c.mask.sum() / np.prod(c.frame_shape) * 100   # % of the FULL frame, not just the cropped bbox
             valid = [c.valid(w).sum() / max(c.mask.sum(), 1) * 100 for w in range(len(cfg["wavelengths"]))]
             r0 = c.R[0][:, c.mask]; r1 = c.R[1][:, c.mask]
             msg = (f"{name}: ROI {roi:.0f}% of frame, Rd f0 {np.nanmedian(r0):.3f}, f0.1 {np.nanmedian(r1):.3f} (medians), "

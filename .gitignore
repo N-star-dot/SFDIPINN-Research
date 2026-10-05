@@ -13,3 +13,8 @@ results/
 .DS_Store
 .idea/
 .vscode/
+
+# code-cycle memory
+.claude/cycle/
+# real-data ingest output (large, regenerable)
+data/processed/

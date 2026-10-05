@@ -36,12 +36,36 @@ class LUT:
     def from_mat(cls, path, keys):
         """keys maps our names to the .mat variable names, e.g.
         {'mua': 'mua', 'musp': 'musp', 'freqs': 'fx', 'Rd': 'Rd'}. If the lab's
-        Rd array is ordered differently, fix it with 'Rd_axes' like 'mua,musp,f'."""
-        d = loadmat(path)
+        Rd array is ordered differently, fix it with 'Rd_axes' like 'mua,musp,f'.
+
+        The lab's file is a struct instead: {'struct': 'LUT', 'mua': 'Mua',
+        'musp': 'Musp', 'Rd': ['M1', 'M2'], 'freqs': [0.0, 0.1]}. Mua/Musp are
+        MATLAB meshgrids, Rd is one 2-D array per frequency, and the
+        frequencies are not stored in the file, so they come from the config."""
+        d = loadmat(path, simplify_cells=True)
+        if keys.get("struct"):
+            d = d[keys["struct"]]
+        if isinstance(keys["Rd"], (list, tuple)):
+            return cls._from_meshgrid(d, keys, path)
         Rd = np.asarray(d[keys["Rd"]], float)
         order = keys.get("Rd_axes", "f,mua,musp").split(",")
         Rd = np.transpose(Rd, [order.index(a) for a in ("f", "mua", "musp")])
-        return cls(d[keys["mua"]], d[keys["musp"]], d[keys["freqs"]], Rd, {"source": str(path)})
+        freqs = keys["freqs"] if isinstance(keys["freqs"], (list, tuple)) else d[keys["freqs"]]
+        return cls(d[keys["mua"]], d[keys["musp"]], freqs, Rd, {"source": str(path)})
+
+    @classmethod
+    def _from_meshgrid(cls, d, keys, path):
+        A, S = np.asarray(d[keys["mua"]], float), np.asarray(d[keys["musp"]], float)
+        freqs = list(keys["freqs"])
+        if len(freqs) != len(keys["Rd"]):
+            raise ValueError(f"LUT freqs {freqs} must list one frequency per Rd array {keys['Rd']}")
+        # find which axis mu_a varies along, then put every array in (mua, musp) order
+        mua_ax = 1 if np.ptp(A[0]) > 0 else 0
+        T = (lambda X: X.T) if mua_ax == 1 else (lambda X: X)
+        A, S = T(A), T(S)
+        Rd = np.stack([T(np.asarray(d[k], float)) for k in keys["Rd"]])
+        meta = {"source": str(path), "struct": keys.get("struct"), "Rd": list(keys["Rd"])}
+        return cls(A[:, 0], S[0, :], freqs, Rd, meta)
 
     def save_npz(self, path):
         np.savez_compressed(path, mua=self.mua, musp=self.musp, freqs=self.freqs, Rd=self.Rd,

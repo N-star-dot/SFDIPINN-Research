@@ -13,12 +13,20 @@ WL_COLORS = ["#1f77b4", "#17becf", "#2ca02c", "#bcbd22", "#ff7f0e", "#d62728", "
 
 
 def load_config(path=None):
-    path = path or os.path.join(HERE, "config.yaml")
+    """path, then $SFDI_CONFIG, then config.yaml next to this repo. A relative
+    path (either one) is resolved against the repo root, not the cwd."""
+    path = path or os.environ.get("SFDI_CONFIG") or os.path.join(HERE, "config.yaml")
+    if not os.path.isabs(path):
+        path = os.path.join(HERE, path)
     with open(path) as f:
         cfg = yaml.safe_load(f)
-    for k in ("data_root", "lut_path", "results_dir"):
-        if k in cfg and not os.path.isabs(cfg[k]):
-            cfg[k] = os.path.join(HERE, cfg[k])
+    if "SFDI_DATA_ROOT" in os.environ:                      # override without editing the yaml
+        cfg["data_root"] = os.environ["SFDI_DATA_ROOT"]
+    for k in ("data_root", "lut_path", "results_dir", "processed_root"):
+        if k in cfg:
+            cfg[k] = os.path.expanduser(cfg[k])
+            if not os.path.isabs(cfg[k]):
+                cfg[k] = os.path.join(HERE, cfg[k])
     os.makedirs(cfg["results_dir"], exist_ok=True)
     return cfg
 
