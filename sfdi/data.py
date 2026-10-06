@@ -98,18 +98,43 @@ def load_mask(path, shape=None):
     raise ValueError(f"unknown mask type {path}")
 
 
+def _plateau(x, min_count=100, min_frac=1e-4):
+    """The value a LUT inversion got clamped to, or None. A clamp shows up as
+    the array's maximum repeated on many pixels; a genuine maximum is ~unique."""
+    x = x[np.isfinite(x)]
+    if x.size == 0:
+        return None
+    top = float(x.max())
+    n = int(np.count_nonzero(np.abs(x - top) <= 1e-6 * abs(top)))
+    return top if n >= max(min_count, min_frac * x.size) else None
+
+
+def resolve_caps(mua, musp, ref_caps):
+    """Turn ref_caps into numbers. 'auto' detects the clamp per file, since
+    subjects were not all inverted with the same bound (C3 sits at 0.1955,
+    the others at 0.2). Detection uses the whole frame, not the ROI, so the
+    raw and processed loading paths always agree."""
+    out = {}
+    for k, arr in (("mua", mua), ("musp", musp)):
+        v = ref_caps.get(k)
+        out[k] = _plateau(np.asarray(arr)) if v == "auto" else v
+    return out
+
+
 def apply_ref_caps(mua, musp, ref_caps, roi=None):
-    """The lab's LUT inversion hits a wall at its bounds (mu_a capped at exactly
-    0.2 on many 471 nm pixels) and sometimes fails outright (NaN); both are "no
-    answer", not real readings, so turn capped pixels into NaN too -- downstream
-    code (Cell.valid) already drops NaNs. Returns per-wavelength counts of
-    (capped, already-NaN) pixels, counted within `roi` if given else over the
-    whole frame; that's what ingest.py puts in the manifest."""
+    """The lab's LUT inversion hits a wall at its bounds (mu_a clamped on many
+    471 nm pixels) and sometimes fails outright (NaN); both are "no answer",
+    not real readings, so turn capped pixels into NaN too -- downstream code
+    (Cell.valid) already drops NaNs. Caps are numbers or 'auto' (see
+    resolve_caps). Returns per-wavelength counts of (capped, already-NaN)
+    pixels, counted within `roi` if given else over the whole frame; that's
+    what ingest.py puts in the manifest."""
     mua = np.array(mua, dtype=np.float32, copy=True)
     musp = np.array(musp, dtype=np.float32, copy=True)
     n_wl = len(mua)
     region = roi if roi is not None else np.ones(mua.shape[-2:], bool)
-    cap_a, cap_s = ref_caps.get("mua"), ref_caps.get("musp")
+    caps = resolve_caps(mua, musp, ref_caps)
+    cap_a, cap_s = caps["mua"], caps["musp"]
     capped, nan = [0] * n_wl, [0] * n_wl
     for w in range(n_wl):
         bad = np.zeros(mua[w].shape, bool)

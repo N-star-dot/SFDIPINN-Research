@@ -218,3 +218,39 @@ def test_t9_similarly_named_folder_is_unrecognised_not_fatal(tree):
     man = ingest.run(make_cfg(raw, out))
     reasons = {os.path.basename(s["path"]): s["reason"] for s in man["skipped"]}
     assert "unrecognised" in reasons["C1-Arm2"] and "unrecognised" in reasons["C1-Arm-old"]
+
+
+# t10 ------------------------------------------------------------- per-file cap detection
+from sfdi.data import apply_ref_caps, resolve_caps
+
+
+def test_t10_auto_cap_finds_a_cap_other_than_0p2():
+    rng = np.random.default_rng(3)
+    mua = rng.uniform(0.005, 0.15, (8, H, W)).astype(np.float32)
+    mua[0, :10, :] = 0.1955                                       # C3-style cap, 320 pixels
+    musp = rng.uniform(0.5, 2.0, (8, H, W)).astype(np.float32)
+    caps = resolve_caps(mua, musp, {"mua": "auto", "musp": "auto"})
+    assert caps["mua"] == pytest.approx(0.1955) and caps["musp"] is None
+    a, s, capped, _ = apply_ref_caps(mua, musp, {"mua": "auto", "musp": "auto"})
+    assert capped[0] == 320 and np.isnan(a[0, :10]).all() and np.isfinite(a[1]).all()
+
+
+def test_t10_auto_cap_leaves_uncapped_data_alone():
+    rng = np.random.default_rng(4)
+    mua = rng.uniform(0.005, 0.15, (8, H, W)).astype(np.float32)
+    musp = rng.uniform(0.5, 2.0, (8, H, W)).astype(np.float32)
+    _, _, capped, _ = apply_ref_caps(mua, musp, {"mua": "auto", "musp": "auto"})
+    assert sum(capped) == 0
+
+
+def test_t10_auto_cap_through_ingest_reports_detected_value(tree):
+    raw, out, _ = tree
+    cfg = make_cfg(raw, out); cfg["ref_caps"] = {"mua": "auto"}
+    man = ingest.run(cfg)
+    rep = man["cells"]["C1-Arm-Left"]
+    assert rep["ref_caps_used"]["mua"] == pytest.approx(CAP) and rep["ref_capped_pixels"][0] == 22
+    fast = Cell(cfg, "C1", "Arm", "Left")
+    slow_cfg = dict(cfg); slow_cfg.pop("processed_root")
+    slow = Cell(slow_cfg, "C1", "Arm", "Left")
+    for w in range(len(WL)):
+        np.testing.assert_array_equal(fast.pixels(w)[1], slow.pixels(w)[1])

@@ -26,7 +26,7 @@ use_freqs: [0.0, 0.1]                                       # the two the PINN u
 # The lab's supplied mu_a maps are LUT inversions that hit the LUT bound and
 # get capped at exactly this value on many 471 nm pixels; those pixels (and
 # any NaN failed-inversion pixels) are excluded, not treated as real readings.
-ref_caps: {mua: 0.2}    # ASK PL: confirm this is really the LUT bound
+ref_caps: {mua: auto, musp: auto}   # auto = detect the LUT clamp per file (C3 is clamped at 0.1955, others at 0.2)
 
 subjects: [C1, C2, C3, P1, P2]
 sites: [Arm, Hand]

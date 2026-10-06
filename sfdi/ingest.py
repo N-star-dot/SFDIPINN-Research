@@ -21,7 +21,7 @@ from concurrent.futures import ThreadPoolExecutor
 import numpy as np
 import tifffile
 
-from .data import read_hyperstack, hyperstack_labels, load_mask, apply_ref_caps, ingest_signature
+from .data import read_hyperstack, hyperstack_labels, load_mask, apply_ref_caps, resolve_caps, ingest_signature
 
 _CHUNK = 1 << 20   # 1 MB
 # A duplicate-folder candidate is the expected name plus a macOS copy suffix
@@ -180,6 +180,7 @@ def _ingest_one(cfg, subject, site, side, sig):
     y0, y1, x0, x1 = int(ys.min()), int(ys.max()) + 1, int(xs.min()), int(xs.max()) + 1   # half-open bbox
 
     mua, musp, capped, nan = apply_ref_caps(mua_full, musp_full, cfg.get("ref_caps", {}), roi=mask)
+    caps_used = resolve_caps(mua_full, musp_full, cfg.get("ref_caps", {}))
     roi_pixels = int(mask.sum())
 
     warnings, bad_wl = [], []
@@ -211,7 +212,7 @@ def _ingest_one(cfg, subject, site, side, sig):
         sources[rel] = [st.st_size, st.st_mtime_ns]
 
     return {"file": fname, "sources": sources, "roi_pixels": roi_pixels,
-            "ref_capped_pixels": capped, "ref_nan_pixels": nan,
+            "ref_capped_pixels": capped, "ref_nan_pixels": nan, "ref_caps_used": caps_used,
             "warnings": warnings, "signature": sig}
 
 
