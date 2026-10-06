@@ -5,9 +5,9 @@ tissue optical properties (absorption μₐ and reduced scattering μₛ′) fro
 reflectance, and trains a **Physics-Informed Neural Network (PINN)** to do the
 inversion more accurately than the classical analytic models.
 
-It reproduces the Tian Lab PINN study one step at a time. Out of the box it runs
-end-to-end on synthetic stand-in data; point `config.yaml` at the lab's real files
-to get the real numbers.
+It reproduces the Tian Lab PINN study one step at a time. `config.yaml` runs on the
+lab's real data and Monte Carlo LUT; `config.synthetic.yaml` runs the same steps on
+synthetic stand-in data with a stand-in LUT, for testing without the lab's files.
 
 ## What it does
 
@@ -53,7 +53,11 @@ Add `--quick` to steps 3 and 4 for a fast smoke test (a few hundred steps). Full
 settings are 10,000 steps at batch 32,768 — roughly 20 minutes per run on a 2-core
 CPU, much faster on a GPU.
 
-`example_results/` shows what every script produced on the real data (the lab's LUT and actual human subjects).
+`example_results/` holds a snapshot of every script's output on the real data (the lab's
+LUT and the human subjects). It was made before C3's clamped μₐ values were excluded
+(`ref_caps: auto`), so its 471/526 nm errors are inflated, and its `04_*` ablations
+come from a `--quick` run. Fresh outputs go to `results/real/` (real) and
+`results/synthetic/` (synthetic); neither folder is tracked by git.
 
 ## Switching to real data
 
