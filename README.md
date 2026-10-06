@@ -161,22 +161,27 @@ Cuccia gets μₐ to 3.0% but μₛ′ only to 17.8%; PCBC gets 4.3% and 3.3%.
 
 | Wavelength (nm) | 471 | 526 | 591 | 621 | 691 | 731 | 811 | 851 |
 |---|---|---|---|---|---|---|---|---|
-| PCBC μₐ error % | 59.2 | 33.4 | 5.6 | 4.5 | 4.4 | 4.2 | 5.0 | 5.2 |
-| PCBC μₛ′ error % | 23.3 | 12.2 | 2.1 | 3.2 | 4.0 | 4.3 | 4.5 | 4.5 |
-| Cuccia μₐ error % | 68.1 | 40.5 | 2.8 | 2.2 | 4.4 | 5.3 | 6.1 | 6.2 |
-| Cuccia μₛ′ error % | 12.5 | 17.0 | 20.8 | 17.2 | 15.1 | 14.3 | 13.4 | 13.4 |
+| PCBC μₐ error % | 3.6 | 6.8 | 4.9 | 4.6 | 4.4 | 4.2 | 5.0 | 5.2 |
+| PCBC μₛ′ error % | 3.5 | 1.5 | 1.8 | 3.2 | 4.0 | 4.3 | 4.5 | 4.5 |
+| Cuccia μₐ error % | 1.0 | 1.3 | 0.7 | 2.2 | 4.4 | 5.3 | 6.1 | 6.2 |
+| Cuccia μₛ′ error % | 29.6 | 23.8 | 20.5 | 17.2 | 15.1 | 14.3 | 13.4 | 13.4 |
+| Pixels graded (C2 + C3) | 10k | 177k | 3.2M | 3.7M | 3.7M | 3.7M | 3.7M | 3.7M |
+
+PCBC gets both properties to within about 2 to 7% at every wavelength. Cuccia gets μₐ
+well but is 13 to 30% off on μₛ′ everywhere, because the PINN learns its physics from
+Cuccia's forward model and inherits that model's scattering bias.
 
 Per-pixel μₐ error on the held-out C2-Arm-Left. 471 nm is empty and 526 nm is sparse because
-almost every pixel there was capped in the lab's reference map.
+almost every pixel there was clamped in the lab's reference map and is excluded.
 
 ![PINN mu_a error maps](docs/real_results/03b_maps_mua_C2-Arm-Left.png)
 
-**Read the 471 and 526 nm numbers with care.** C3's reference μₐ is capped at 0.1955 rather
-than 0.2, so `ref_caps: {mua: 0.2}` does not catch it, and those capped values are still being
-graded. Inverting C3's Rd through the LUT disagrees with its supplied μₐ by 50 to 97% at
-471/526 nm, against under 0.5% at 621 and 811 nm. Those two columns will change once C3's cap
-is handled. Even before that, only ~2% (471 nm) and ~20% (526 nm) of ROI pixels have a usable
-reference value.
+**About 471 and 526 nm.** The lab's LUT inversion clamped μₐ on most pixels at these
+wavelengths (at 0.2 for most subjects, 0.1955 for C3). `ref_caps: auto` detects the clamp in
+each file and drops those pixels, so these columns are graded on far fewer pixels (see the last
+row), and only on the ones with lower absorption, which are the easier ones. Before the per-file
+clamp detection, C3's clamped values were graded as real and these two columns read 59% and 33%
+(PCBC μₐ).
 
 ## Code map
 
@@ -196,6 +201,10 @@ reference value.
 With the lab's real data and LUT, the code successfully reproduces the reference study's findings:
 1. **Forward model accuracy**: PCBC significantly outperforms Cuccia, particularly at shorter wavelengths (471 and 526 nm).
 2. **PINN training**: As shown in the ablations below, training exclusively on the longer wavelengths (811/851 nm) noticeably improves the held-out $\mu_s^\prime$ error compared to training on all wavelengths.
+
+The ablation table below comes from a `--quick` (300-step) run made before per-file clamp
+detection, so it still includes C3's clamped 471/526 nm values; rerun
+`python scripts/04_ablation.py` for current full-length numbers.
 
 ```text
             run  model                                               train                     wavelengths  held_out_mua_%  held_out_musp_%
