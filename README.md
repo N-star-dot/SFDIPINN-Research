@@ -198,23 +198,34 @@ clamp detection, C3's clamped values were graded as real and these two columns r
 
 ## Notes on reproducibility
 
-With the lab's real data and LUT, the code successfully reproduces the reference study's findings:
-1. **Forward model accuracy**: PCBC significantly outperforms Cuccia, particularly at shorter wavelengths (471 and 526 nm).
-2. **PINN training**: As shown in the ablations below, training exclusively on the longer wavelengths (811/851 nm) noticeably improves the held-out $\mu_s^\prime$ error compared to training on all wavelengths.
+Ablations on the real data and the lab's LUT, full length (10,000 steps), with per-file clamp
+detection. Each run trains on the listed cells and wavelengths, then is graded at all eight
+wavelengths on every cell it did not train on (16 of the 20 subject/site/side cells, or 18 for
+the single-site runs). Errors are pixel-pooled mean absolute relative error against the lab's
+supplied maps.
 
-The ablation table below comes from a `--quick` (300-step) run made before per-file clamp
-detection, so it still includes C3's clamped 471/526 nm values; rerun
-`python scripts/04_ablation.py` for current full-length numbers.
+| Run | Model | Trained on | Training wavelengths (nm) | Held-out μₐ error % | Held-out μₛ′ error % |
+|---|---|---|---|---|---|
+| `all_wavelengths` | pcbc | C2-Arm-Left, C2-Arm-Right, C2-Hand-Left, C2-Hand-Right | 471, 526, 591, 621, 691, 731, 811, 851 | 4.24 | 3.76 |
+| `wl_621_851` | pcbc | C2-Arm-Left, C2-Arm-Right, C2-Hand-Left, C2-Hand-Right | 621, 691, 731, 811, 851 | 4.90 | 3.81 |
+| `wl_811_851` | pcbc | C2-Arm-Left, C2-Arm-Right, C2-Hand-Left, C2-Hand-Right | 811, 851 | 6.14 | 4.15 |
+| `wl_811` | pcbc | C2-Arm-Left, C2-Arm-Right, C2-Hand-Left, C2-Hand-Right | 811 | 6.37 | 4.14 |
+| `wl_471_526` | pcbc | C2-Arm-Left, C2-Arm-Right, C2-Hand-Left, C2-Hand-Right | 471, 526 | 17.04 | 17.35 |
+| `site_C2_arm` | pcbc | C2-Arm-Left, C2-Arm-Right | 471, 526, 591, 621, 691, 731, 811, 851 | 4.24 | 3.67 |
+| `site_C2_hand` | pcbc | C2-Hand-Left, C2-Hand-Right | 471, 526, 591, 621, 691, 731, 811, 851 | 4.21 | 3.78 |
+| `subject_C1` | pcbc | C1-Arm-Left, C1-Arm-Right, C1-Hand-Left, C1-Hand-Right | 471, 526, 591, 621, 691, 731, 811, 851 | 4.62 | 3.81 |
+| `model_cuccia` | cuccia | C2-Arm-Left, C2-Arm-Right, C2-Hand-Left, C2-Hand-Right | 471, 526, 591, 621, 691, 731, 811, 851 | 4.14 | 16.33 |
 
-```text
-            run  model                                               train                     wavelengths  held_out_mua_%  held_out_musp_%
-all_wavelengths   pcbc C2-Arm-Left,C2-Arm-Right,C2-Hand-Left,C2-Hand-Right 471,526,591,621,691,731,811,851            6.19             5.51
-     wl_621_851   pcbc C2-Arm-Left,C2-Arm-Right,C2-Hand-Left,C2-Hand-Right             621,691,731,811,851            7.68             5.26
-     wl_811_851   pcbc C2-Arm-Left,C2-Arm-Right,C2-Hand-Left,C2-Hand-Right                         811,851           12.56             4.97
-         wl_811   pcbc C2-Arm-Left,C2-Arm-Right,C2-Hand-Left,C2-Hand-Right                             811           12.12             6.26
-     wl_471_526   pcbc C2-Arm-Left,C2-Arm-Right,C2-Hand-Left,C2-Hand-Right                         471,526          234.75            51.18
-    site_C2_arm   pcbc                            C2-Arm-Left,C2-Arm-Right 471,526,591,621,691,731,811,851            5.73             4.35
-   site_C2_hand   pcbc                          C2-Hand-Left,C2-Hand-Right 471,526,591,621,691,731,811,851            7.10             6.15
-     subject_C1   pcbc C1-Arm-Left,C1-Arm-Right,C1-Hand-Left,C1-Hand-Right 471,526,591,621,691,731,811,851           10.81             4.26
-   model_cuccia cuccia C2-Arm-Left,C2-Arm-Right,C2-Hand-Left,C2-Hand-Right 471,526,591,621,691,731,811,851            6.13            16.32
-```
+What these show:
+1. **PCBC beats Cuccia on scattering.** Same training, μₐ is about equal (4.2% vs 4.1%) but
+   μₛ′ is 3.8% for PCBC against 16.3% for Cuccia. In the forward model (step 1) PCBC is also
+   much closer to the LUT, most of all at 471 and 526 nm.
+2. **Training on all wavelengths is best.** Restricting training to 621 to 851 nm (4.9% / 3.8%),
+   811/851 nm (6.1% / 4.2%) or 811 nm alone (6.4% / 4.1%) is slightly worse on both properties,
+   and training on 471/526 nm alone is much worse (17% / 17%). The reference study's finding that
+   training on 811/851 nm improves held-out error does **not** reproduce here.
+3. **The network generalises across sites and subjects.** Training on C2's arms only, C2's hands
+   only, or on C1 instead of C2 changes held-out error by under half a percentage point.
+
+These numbers use the textbook Fresnel boundary term for PCBC (n = 1.4). A calibrated B from the
+lab (`A_value` in `config.yaml`) may change them.
