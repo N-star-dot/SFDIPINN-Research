@@ -17,10 +17,10 @@ def train():
     freqs = cfg["use_freqs"]
     R_lut = np.stack([lut.grid(f) for f in freqs], -1) # (n_mua, n_musp, 2)
     
-    # Flatten
-    M = torch.tensor(M.ravel(), dtype=torch.float32)
-    S = torch.tensor(S.ravel(), dtype=torch.float32)
-    R = torch.tensor(R_lut.reshape(-1, 2), dtype=torch.float32)
+    # Subsample to speed up training
+    M = torch.tensor(M[::5, ::5].ravel(), dtype=torch.float32)
+    S = torch.tensor(S[::5, ::5].ravel(), dtype=torch.float32)
+    R = torch.tensor(R_lut[::5, ::5].reshape(-1, 2), dtype=torch.float32)
     
     # Remove any NaN or <=0 values just in case
     valid = (R > 0).all(dim=-1) & (M > 0) & (S > 0)
@@ -42,7 +42,7 @@ def train():
     
     print(f"Training ForwardMLP on {len(X_m)} LUT points...")
     
-    epochs = 10000
+    epochs = 3000
     for ep in range(1, epochs + 1):
         out_Rd = net(X_m, X_s)
         out_log = torch.log(out_Rd.clamp_min(1e-8))

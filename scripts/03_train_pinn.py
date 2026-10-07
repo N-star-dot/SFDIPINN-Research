@@ -54,7 +54,7 @@ for model in a.models.split(","):
 
 # ---- slide 17, right side
 fig, axs = plt.subplots(2, 1, figsize=(7, 8), sharex=True)
-colors = {"cuccia": "#2a78d6", "pcbc": "#eb6834"}
+colors = {"cuccia": "#2a78d6", "pcbc": "#eb6834", "mlp": "#2ca02c"}
 for model, (_, df) in results.items():
     for ax, col in zip(axs, ("mua_err_%", "musp_err_%")):
         ax.plot(df["wavelength"], df[col], "-o", color=colors.get(model), label=model)

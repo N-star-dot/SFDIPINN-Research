@@ -86,5 +86,10 @@ MODELS = {"cuccia": rd_cuccia, "pcbc": rd_pcbc}
 
 def forward(model, mua, musp, freqs, A):
     """Rd at several frequencies, stacked on the last axis."""
+    if model == "mlp":
+        from .forward_mlp import get_forward_mlp
+        net = get_forward_mlp(device=mua.device)
+        return net(mua, musp)  # Outputs shape (..., 2)
+        
     fn = MODELS[model]
     return torch.stack([fn(mua, musp, f, A) for f in freqs], dim=-1)
