@@ -1,8 +1,7 @@
-numpy
-scipy
 torch
-matplotlib
+numpy
 pandas
+scipy
+matplotlib
 pyyaml
 tifffile
-roifile        # only if your masks are ImageJ .roi files
