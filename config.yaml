@@ -68,3 +68,4 @@ ablations:
   - {name: site_C2_hand,     train_on: {subjects: [C2], sites: [Hand]}}
   - {name: subject_C1,       train_on: {subjects: [C1]}}
   - {name: model_cuccia,     train_on: {subjects: [C2]}, model: cuccia}
+  - {name: model_mlp,        train_on: {subjects: [C2]}, model: mlp}
