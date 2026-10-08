@@ -1,5 +1,6 @@
 #!/bin/bash -l
 #$ -l h_rt=12:00:00         # Request 12 hours of runtime
+#$ -pe omp 4                # Request 4 CPU cores
 #$ -N sfdi_ablation         # Name of the job
 #$ -j y                     # Merge standard error and output into one file
 
