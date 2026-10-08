@@ -1,6 +1,5 @@
 #!/bin/bash -l
 #$ -l h_rt=12:00:00         # Request 12 hours of runtime
-#$ -l gpu_c=1               # Request 1 GPU
 #$ -N sfdi_ablation         # Name of the job
 #$ -j y                     # Merge standard error and output into one file
 
